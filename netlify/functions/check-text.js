@@ -60,12 +60,11 @@ ${text}`;
       headers: {
         'Authorization': `Bearer ${OPENROUTER_KEY}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://text-checker.netlify.app', // Укажите ваш домен после деплоя
+        'HTTP-Referer': 'https://frolicking-scone-f5f06d.netlify.app',
         'X-Title': 'Text Checker'
       },
       body: JSON.stringify({
-        model: "qwen/qwen-2.5-7b-instruct:free", // Бесплатная модель с хорошим русским
-        // Альтернативы: "deepseek/deepseek-chat:free", "google/gemma-2-9b-it:free"
+        model: "google/gemma-2-2b-it:free", // ✅ РАБОЧАЯ бесплатная модель
         messages: [{ role: "user", content: prompt }],
         temperature: 0.1, // Минимум креатива, максимум точности
         max_tokens: 2000
