@@ -1,6 +1,6 @@
 [build]
-  functions = "netlify/functions"
   publish = "."
+  functions = "netlify/functions"
 
 [[redirects]]
   from = "/*"
@@ -9,8 +9,3 @@
 
 [functions]
   node_bundler = "esbuild"
-
-# Настройка таймаута для конкретной функции
-[[functions]]
-  pattern = "check-text"
-  timeout = 30
