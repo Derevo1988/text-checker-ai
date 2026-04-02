@@ -46,8 +46,8 @@ exports.handler = async (event) => {
         'X-Title': 'Text Checker'
       },
       body: JSON.stringify({
-        // ✅ РАБОЧАЯ модель с хорошим русским:
-        model: "meta-llama/llama-3.3-70b-instruct:free",
+        // ✅ Авто-выбор доступной бесплатной модели:
+        model: "openrouter/auto",
         messages: [{ role: "user", content: prompt }],
         temperature: 0.1,
         max_tokens: 2000
