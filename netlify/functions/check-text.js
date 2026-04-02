@@ -1,15 +1,10 @@
-// Этот код выполняется на серверах Netlify
-// API-ключ хранится в переменных окружения и не виден пользователям
-
 exports.handler = async (event) => {
-  // Разрешаем CORS для локальной разработки
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS'
   };
 
-  // Обработка preflight-запросов
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers, body: '' };
   }
@@ -25,35 +20,22 @@ exports.handler = async (event) => {
       return { statusCode: 400, headers, body: JSON.stringify({ error: 'Текст слишком длинный (макс. 5000 символов)' }) };
     }
 
-    // 🤖 Запрос к OpenRouter API
     const OPENROUTER_KEY = process.env.OPENROUTER_API_KEY;
     if (!OPENROUTER_KEY) {
-      throw new Error('Не настроен OPENROUTER_API_KEY в переменных окружения Netlify');
+      throw new Error('Не настроен OPENROUTER_API_KEY в Netlify');
     }
 
-    const prompt = `Ты — эксперт по русскому языку. Проверь текст на:
-1. Орфографические ошибки
-2. Пунктуационные ошибки  
-3. Стилистические неточности
-4. Лишние/пропущенные знаки
-
-Верни ответ СТРОГО в формате JSON без лишнего текста:
+    const prompt = `Ты — эксперт по русскому языку. Проверь текст на орфографию, пунктуацию и стиль.
+Верни ответ СТРОГО в формате JSON:
 {
-  "corrected_text": "полностью исправленный текст",
+  "corrected_text": "исправленный текст",
   "errors": [
-    {
-      "original": "фрагмент с ошибкой",
-      "suggestion": "как правильно",
-      "type": "орфография|пунктуация|стиль|знаки",
-      "explanation": "краткое объяснение почему так"
-    }
+    {"original": "ошибка", "suggestion": "исправление", "type": "орфография|пунктуация|стиль", "explanation": "почему"}
   ]
 }
+Если ошибок нет: {"corrected_text": "текст", "errors": []}
 
-Если ошибок нет, верни: {"corrected_text": "текст", "errors": []}
-
-Текст для проверки:
-${text}`;
+Текст: ${text}`;
 
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
@@ -64,9 +46,10 @@ ${text}`;
         'X-Title': 'Text Checker'
       },
       body: JSON.stringify({
-        model: "google/gemma-2-2b-it:free", // ✅ РАБОЧАЯ бесплатная модель
+        // ✅ РАБОЧАЯ модель с хорошим русским:
+        model: "meta-llama/llama-3.3-70b-instruct:free",
         messages: [{ role: "user", content: prompt }],
-        temperature: 0.1, // Минимум креатива, максимум точности
+        temperature: 0.1,
         max_tokens: 2000
       })
     });
@@ -82,7 +65,6 @@ ${text}`;
     
     if (!content) throw new Error('Пустой ответ от ИИ');
 
-    // Парсим ответ: ИИ может добавить ```json ... ```
     let jsonStr = content.trim();
     if (jsonStr.startsWith('```')) {
       jsonStr = jsonStr.replace(/^```json?\n?/, '').replace(/\n?```$/, '');
@@ -94,7 +76,6 @@ ${text}`;
       throw new Error('ИИ не вернул исправленный текст');
     }
 
-    // Возвращаем клиенту
     return {
       statusCode: 200,
       headers,
