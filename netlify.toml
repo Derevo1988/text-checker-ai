@@ -9,8 +9,6 @@
 
 [functions]
   node_bundler = "esbuild"
-  directory = "netlify/functions"
-
-# Настройка таймаута для функции check-text
-[functions.check-text]
+  
+[functions."check-text"]
   timeout = 30
