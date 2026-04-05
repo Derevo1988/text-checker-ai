@@ -30,18 +30,22 @@
       </div>
       
       <div class="tabs">
-        <button class="tab-btn active" data-tab="corrected">Исправленный текст</button>
-        <button class="tab-btn" data-tab="errors">Список ошибок</button>
-        <button class="tab-btn" data-tab="original">С подсветкой ошибок</button>
-      </div>
+  <button class="tab-btn active" data-tab="original">🎨 С подсветкой ошибок</button>
+  <button class="tab-btn" data-tab="errors">⚠️ Список ошибок</button>
+  <button class="tab-btn" data-tab="corrected">📄 Исправленный текст</button>
+</div>
 
-      <div id="corrected" class="tab-content active">
-        <pre id="correctedText"></pre>
-      </div>
-      
-      <div id="errors" class="tab-content">
-        <ul id="errorsList"></ul>
-      </div>
+<div id="original" class="tab-content active">
+  <div id="highlightedText" class="highlighted-text"></div>
+</div>
+
+<div id="errors" class="tab-content">
+  <ul id="errorsList" class="error-list"></ul>
+</div>
+
+<div id="corrected" class="tab-content">
+  <pre id="correctedText"></pre>
+</div>
       
       <div id="original" class="tab-content">
         <div id="highlightedText"></div>
