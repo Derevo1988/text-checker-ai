@@ -1,99 +1,103 @@
-exports.handler = async (event, context) => {
-  // Разрешаем запросы только с вашего домена или локально для тестов
-  const headers = {
-    'Access-Control-Allow-Origin': '*', // В продакшене лучше указать конкретный домен
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Content-Type': 'application/json'
-  };
-
-  // Обработка preflight запросов (OPTIONS)
-  if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 204, headers, body: '' };
-  }
-
-  // Работаем только с POST запросами
+// netlify/functions/check-text.js
+exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
-    return { 
-      statusCode: 405, 
-      headers, 
-      body: JSON.stringify({ error: 'Метод не разрешен. Используйте POST.' }) 
-    };
+    return { statusCode: 405, body: 'Method not allowed' };
   }
 
   try {
-    const data = JSON.parse(event.body);
-    const textToCheck = data.text;
-
-    if (!textToCheck) {
-      return { 
-        statusCode: 400, 
-        headers, 
-        body: JSON.stringify({ error: 'Поле "text" обязательно.' }) 
+    const { text } = JSON.parse(event.body);
+    const apiKey = process.env.GROQ_API_KEY;
+    
+    if (!apiKey) {
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ error: 'GROQ_API_KEY не найден. Добавьте его в переменные окружения Netlify.' })
       };
     }
 
-    const apiKey = process.env.OPENROUTER_API_KEY;
-    if (!apiKey) {
-      console.error('API ключ не найден в переменных окружения');
-      throw new Error('Серверная ошибка: не настроен API ключ');
-    }
-
-    // Настраиваем таймаут через AbortController
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 секунд + запас до лимита Netlify
-
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    // Запрос к Groq API
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://frolicking-scone-f5f06d.netlify.app', // Обязательно для OpenRouter
-        'X-Title': 'Text Checker App'
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: "mistralai/mistral-7b-instruct:free", // Или другая бесплатная/дешевая модель
+        model: 'llama-3.3-70b-versatile', // или 'mixtral-8x7b-32768'
         messages: [
           {
-            role: "user",
-            content: `Проверь следующий текст на грамотность и стилистику. Если есть ошибки, исправь их и кратко объясни. Если ошибок нет, напиши "Текст хорош". Текст: "${textToCheck}"`
+            role: 'system',
+            content: `Ты - эксперт по русскому языку. Найди в тексте все ошибки (орфографические, пунктуационные, стилистические). Верни результат ТОЛЬКО в формате JSON без лишнего текста:
+            {
+              "corrected_text": "исправленный текст",
+              "errors": [
+                {
+                  "original": "ошибочный фрагмент",
+                  "suggestion": "исправленный вариант",
+                  "type": "орфография/пунктуация/стиль",
+                  "explanation": "почему так правильно"
+                }
+              ]
+            }`
+          },
+          {
+            role: 'user',
+            content: text
           }
-        ]
-      }),
-      signal: controller.signal
+        ],
+        temperature: 0.3,
+        max_tokens: 2000
+      })
     });
 
-    clearTimeout(timeoutId);
-
     if (!response.ok) {
-      const errorData = await response.text();
-      console.error(`Ошибка API: ${response.status}`, errorData);
-      throw new Error(`Ошибка внешнего сервиса: ${response.status}`);
+      const errorData = await response.json();
+      throw new Error(`Groq API error: ${JSON.stringify(errorData)}`);
     }
 
-    const result = await response.json();
+    const data = await response.json();
+    const aiResponse = data.choices[0].message.content;
     
-    // Извлекаем ответ модели
-    const answer = result.choices?.[0]?.message?.content || "Нет ответа от модели";
-
+    // Извлекаем JSON из ответа
+    let result;
+    try {
+      // Пробуем найти JSON в ответе
+      const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        result = JSON.parse(jsonMatch[0]);
+      } else {
+        result = JSON.parse(aiResponse);
+      }
+    } catch (e) {
+      console.error('Failed to parse AI response:', aiResponse);
+      result = {
+        corrected_text: text,
+        errors: [{
+          original: "ошибка парсинга",
+          suggestion: "проверьте текст",
+          type: "система",
+          explanation: "Не удалось обработать ответ ИИ. Попробуйте ещё раз."
+        }]
+      };
+    }
+    
     return {
       statusCode: 200,
-      headers,
-      body: JSON.stringify({ result: answer })
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      },
+      body: JSON.stringify(result)
     };
 
   } catch (error) {
-    console.error('Критическая ошибка в функции:', error.message);
-    
-    let errorMessage = "Не удалось обработать запрос.";
-    if (error.name === 'AbortError') {
-      errorMessage = "Превышено время ожидания ответа от сервиса. Попробуйте позже.";
-    }
-
+    console.error('Function error:', error);
     return {
       statusCode: 500,
-      headers,
-      body: JSON.stringify({ error: errorMessage })
+      body: JSON.stringify({ 
+        error: 'Ошибка при проверке текста',
+        details: error.message 
+      })
     };
   }
 };
